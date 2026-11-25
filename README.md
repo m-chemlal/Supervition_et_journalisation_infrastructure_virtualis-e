@@ -2,7 +2,7 @@
 
 Projet académique **M352 — Sécurité de la virtualisation et du Cloud Computing**, ENSIASD.
 
-**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau du nœud est documentée. Les VM Linux et Windows existent déjà. Leur import dans Proxmox, le déploiement de Wazuh et les tests restent à documenter.
+**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. L’ajout de la VM Ubuntu est lancé sur Proxmox (ID 100). La fin de la tâche, le démarrage d’Ubuntu, l’import de la VM Windows et le déploiement de Wazuh restent à documenter.
 
 ## Objectif
 
@@ -70,11 +70,63 @@ Le navigateur signale un problème de confiance avec le certificat HTTPS. La cap
 
 **Validation obtenue** — Le laptop atteint l’interface web de Proxmox et le pont `vmbr0` dispose d’une adresse IPv4. Le prochain test consiste à démarrer une VM dans Proxmox, puis à vérifier son accès au réseau du lab.
 
+## Étape 2 — Vérifier le stockage après modification
+
+Dans l’interface de Proxmox, ouvrir **Datacenter → pve → local (pve) → Summary**. Cette vue permet de vérifier que le stockage est disponible avant d’y transférer les fichiers des VM.
+
+![Résumé du stockage local sur Proxmox VE après modification](docs/images/03-stockage-local-proxmox.png)
+
+*Figure 3 — Capacité, utilisation et types de contenu du stockage `local`.*
+
+| Élément | Valeur observée |
+|---|---|
+| Type de stockage | `Directory` |
+| État | Activé et actif |
+| Capacité affichée | 40,64 Go |
+| Espace utilisé | 8,90 Go (21,89 %) |
+| Espace disponible estimé | 31,74 Go |
+| Types de contenu autorisés | Images de disque, fichiers d’import, images ISO et modèles de conteneurs |
+
+**Validation obtenue** — Le stockage `local` est actif et le type de contenu **Import** est autorisé. La capture documente la capacité après modification. La capacité initiale et la taille de l’augmentation restent à renseigner. Avant de transférer l’export de la VM Linux, comparer sa taille à l’espace disponible et prévoir l’espace nécessaire au disque importé sur le stockage de destination.
+
+## Étape 3 — Ajouter la VM Ubuntu dans Proxmox
+
+La VM Ubuntu apparaît sous le nœud `pve` avec l’identifiant `100`. Pour vérifier que son disque apparaît sur le stockage choisi, ouvrir **Datacenter → pve → local (pve) → VM Disks**.
+
+![VM 100 dans Proxmox et disque QCOW2 associé sur le stockage local](docs/images/04-ajout-vm-ubuntu.png)
+
+*Figure 4 — VM Ubuntu en cours de création et disque associé dans le stockage `local`.*
+
+| Élément | Valeur observée |
+|---|---|
+| Identifiant de la VM | `100` |
+| Stockage | `local (pve)` |
+| Disque | `vm-100-disk-0.qcow2` |
+| Format | `qcow2` |
+| Capacité virtuelle affichée | 512,00 GiB |
+| Tâche | `VM 100 - Create`, en cours au moment de la capture |
+
+Les **512 GiB** correspondent à la capacité virtuelle du disque. Sur le stockage `local`, l’espace réellement utilisé par ce fichier reste à mesurer avant de poursuivre les imports.
+
+### 3.1 Suivre le transfert du disque avant le démarrage
+
+Dans **Tasks → VM 100 - Create → Output**, le transfert du disque est à **51,03 %** au moment de la capture (`261.3 GiB of 512.0 GiB` dans le journal). Cette valeur indique la progression du traitement du disque virtuel. L’espace occupé sur le stockage `local` doit être contrôlé séparément.
+
+![Journal du transfert du disque de la VM Ubuntu à 51,03 % et erreurs de verrouillage](docs/images/05-transfert-disque-ubuntu.png)
+
+*Figure 5 — Transfert du disque en cours et tentatives de démarrage bloquées.*
+
+La mention `(create)` indique que la VM est verrouillée pendant sa création. Les tentatives de démarrage visibles dans la liste des tâches échouent avec le message `can't lock file`. Laisser le transfert se terminer avant de relancer le démarrage.
+
+**Vérification suivante** — Une fois la tâche de création au statut `OK`, cliquer sur **VM 100 → Start**, puis ouvrir **Console** pour vérifier le démarrage d’Ubuntu. Dans Ubuntu, lancer `ip -br addr` pour relever son adresse IP.
+
 ## Étapes de déploiement
 
 - [x] Repérer l’adresse IP de `vmbr0`, puis accéder à l’interface de Proxmox.
-- [ ] Vérifier la virtualisation imbriquée sur le laptop et démarrer une VM de test dans Proxmox.
-- [ ] Importer d’abord la VM Linux, puis la VM Windows. Vérifier le démarrage et conserver les VM d’origine jusqu’à la validation.
+- [x] Vérifier l’état, la capacité et les types de contenu du stockage `local`.
+- [x] Lancer l’ajout de la VM Ubuntu dans Proxmox et repérer son disque dans `local`.
+- [ ] Confirmer le statut de la tâche, le démarrage d’Ubuntu et son accès au réseau du lab.
+- [ ] Importer la VM Windows et vérifier son démarrage. Conserver les VM d’origine jusqu’à la validation.
 - [ ] Déployer les trois services Wazuh sur le PC 2 et vérifier l’accès au tableau de bord.
 - [ ] Tester la connectivité vers Wazuh depuis les deux VM, installer les agents et vérifier leur statut.
 - [ ] Configurer la collecte des journaux de Proxmox et valider la durée de conservation des journaux.
