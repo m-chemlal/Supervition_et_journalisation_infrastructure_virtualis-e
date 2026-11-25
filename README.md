@@ -2,7 +2,7 @@
 
 Projet académique **M352 — Sécurité de la virtualisation et du Cloud Computing**, ENSIASD.
 
-**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. L’import de la VM Windows, le déploiement de Wazuh et les tests de connectivité restent à documenter.
+**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. Le serveur Wazuh est déployé sur Fedora 43 avec Docker Compose et son tableau de bord est accessible. L’agent Wazuh est installé et démarré sur Ubuntu. Il a été configuré pour le manager du PC 2 et sa connexion est confirmée par l’équipe. La capture du statut de l’agent, les journaux reçus et l’import de la VM Windows restent à documenter.
 
 ## Objectif
 
@@ -19,7 +19,7 @@ flowchart TB
         PVE --- LNX
         PVE --- WIN
     end
-    subgraph PC2["PC 2 — Ubuntu et Docker Compose"]
+    subgraph PC2["PC 2 — Fedora 43 et Docker Compose"]
         MGR["Wazuh Manager"]
         IDX["Wazuh Indexer"]
         UI["Wazuh Dashboard"]
@@ -33,7 +33,7 @@ flowchart TB
 
 Sur le **PC 1**, Proxmox VE est accessible depuis le laptop Windows. La VM Ubuntu démarre désormais dans Proxmox, comme le montre la section 3.2. L’import de la VM Windows reste à documenter.
 
-Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard seront déployés avec Docker Compose sur Ubuntu. Les agents utiliseront l’adresse IP locale du serveur Wazuh. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. La méthode de collecte des journaux Proxmox reste à choisir.
+Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard s’exécutent avec Docker Compose sur Fedora 43. Pour Ubuntu, l’adresse du manager Wazuh utilisée est `192.168.100.238`. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. La méthode de collecte des journaux Proxmox reste à choisir.
 
 ## Étape 0 — Activer la virtualisation imbriquée pour Proxmox
 
@@ -153,7 +153,121 @@ hostname
 | Interface réseau | `ens18`, état `UP` |
 | IPv4 dans Ubuntu | `192.168.100.229/24`, attribuée dynamiquement |
 
-**Validation obtenue** — Ubuntu a démarré et dispose d’une adresse dans le réseau `192.168.100.0/24`. La connexion au serveur Wazuh sur le PC 2 sera vérifiée séparément depuis Ubuntu.
+**Validation obtenue** — Ubuntu a démarré et dispose d’une adresse dans le réseau `192.168.100.0/24`. La configuration de l’agent Wazuh est détaillée à l’étape 5.
+
+## Étape 4 — Déployer le serveur Wazuh sur Fedora 43
+
+Le PC 2 héberge les trois composants Wazuh sur une seule machine. **Manager** reçoit et analyse les événements, **Indexer** stocke et indexe les alertes, et **Dashboard** permet de les consulter. Le déploiement utilise le mode `single-node` du dépôt officiel `wazuh-docker`, au tag `v4.14.10`.
+
+### 4.1 Vérifier les prérequis et préparer Fedora
+
+| Vérification | Résultat relevé avant le déploiement |
+|---|---|
+| Docker Engine | 29.10.0, service actif |
+| Docker Compose | 5.7.1 |
+| Git | 2.56.1 |
+| `vm.max_map_count` | 1048576 avant modification |
+| Ports TCP contrôlés | Aucune écoute relevée sur 443, 1514, 1515, 9200 et 55000 |
+| Conteneurs existants | Minikube et hello-world à l’arrêt |
+
+Le paramètre noyau `vm.max_map_count` fixe le nombre maximal de zones mémoire qu’un processus peut mapper. L’équipe a enregistré la valeur `262144` dans un fichier de configuration persistant pour Wazuh Indexer, puis a rechargé la configuration système.
+
+```bash
+echo "vm.max_map_count=262144" | sudo tee /etc/sysctl.d/99-wazuh-max-map-count.conf
+sudo sysctl --system
+```
+
+### 4.2 Récupérer la configuration Docker Compose
+
+```bash
+cd ~/Downloads
+git clone https://github.com/wazuh/wazuh-docker.git -b v4.14.10
+cd wazuh-docker/single-node
+ls -la
+```
+
+Le répertoire contient le fichier `docker-compose.yml`, la configuration des services dans `config/` et le fichier `generate-indexer-certs.yml`.
+
+![Contenu du dossier single-node du dépôt wazuh-docker](docs/images/07-wazuh-dossier-single-node.png)
+
+*Figure 7 — Fichiers de déploiement Docker Compose.*
+
+### 4.3 Générer et vérifier les certificats TLS
+
+```bash
+docker compose -f generate-indexer-certs.yml run --rm generator
+sudo ls -lh config/wazuh_indexer_ssl_certs/
+```
+
+Le générateur crée l’autorité de certification ainsi que les certificats et clés utilisés par les composants Wazuh. L’option `--rm` supprime le conteneur de génération après son exécution. Le journal affiche aussi `find: command not found`. La seconde capture montre que les fichiers attendus sont présents dans leur dossier de destination.
+
+![Journal du générateur de certificats Wazuh](docs/images/08-wazuh-generation-certificats.png)
+
+*Figure 8 — Génération des certificats TLS.*
+
+![Liste des certificats et fichiers de clés produits sur Fedora](docs/images/09-wazuh-fichiers-certificats.png)
+
+*Figure 9 — Vérification des fichiers générés dans `config/wazuh_indexer_ssl_certs/`.*
+
+### 4.4 Démarrer Manager, Indexer et Dashboard
+
+```bash
+docker compose up -d
+```
+
+Docker Compose télécharge les images, crée les volumes et lance les trois services. La sortie affiche `Started` pour les conteneurs Manager, Indexer et Dashboard.
+
+![Démarrage des trois conteneurs Wazuh avec Docker Compose](docs/images/10-wazuh-demarrage-compose.png)
+
+*Figure 10 — Démarrage des services Wazuh.*
+
+| Port du fichier Compose v4.14.10 | Usage |
+|---|---|
+| TCP 443 | Accès HTTPS au Dashboard |
+| TCP 1514 | Communication des agents avec le Manager |
+| TCP 1515 | Enrôlement des agents |
+| TCP 55000 | API du Manager |
+| TCP 9200 | API de l’Indexer |
+| UDP 514 | Publication du port Syslog, à configurer si ce mode de collecte est retenu |
+
+### 4.5 Vérifier l’accès au tableau de bord
+
+Depuis Fedora, la page de connexion s’affiche dans le navigateur. Après authentification, la vue **Overview** s’ouvre à l’adresse locale. Cette capture date d’avant l’enrôlement de l’agent Ubuntu. La connexion des agents et les journaux reçus font l’objet de vérifications propres à l’étape suivante.
+
+![Page de connexion au tableau de bord Wazuh](docs/images/11-wazuh-page-connexion.png)
+
+*Figure 11 — Page de connexion Wazuh.*
+
+![Vue Overview du tableau de bord Wazuh avant l’enrôlement d’agents](docs/images/12-wazuh-dashboard-overview.png)
+
+*Figure 12 — Tableau de bord opérationnel, avant l’enrôlement des agents.*
+
+
+## Étape 5 — Connecter l’agent Ubuntu au manager Wazuh
+
+Sur la VM `ubuntu-endpoint` (ID `100`), le paquet `wazuh-agent` a été installé depuis le dépôt APT Wazuh. La variable `WAZUH_MANAGER` indique l’adresse du manager sur le PC 2. Les commandes suivantes reprennent celles exécutées dans la capture.
+
+```bash
+sudo WAZUH_MANAGER="192.168.100.238" apt-get install wazuh-agent
+sudo systemctl daemon-reload
+sudo systemctl enable wazuh-agent
+sudo systemctl start wazuh-agent
+sudo systemctl status wazuh-agent
+```
+
+![Installation et état du service Wazuh Agent dans la console Ubuntu](docs/images/13-agent-wazuh-ubuntu.png)
+
+*Figure 13 — Agent Wazuh installé, activé au démarrage et en cours d’exécution sur Ubuntu.*
+
+| Vérification | Résultat |
+|---|---|
+| Version du paquet | `4.14.11-1` |
+| Manager configuré | `192.168.100.238` |
+| Service sur Ubuntu | `enabled` et `active (running)` |
+| Connexion au manager | Confirmée par l’équipe. Capture du statut `Active` dans le tableau de bord à joindre. |
+| Réception des journaux | À vérifier avec un événement généré sur Ubuntu. |
+
+**Versions relevées** — Le déploiement serveur documenté utilise Wazuh `4.14.10`. La capture Ubuntu montre un agent `4.14.11-1`. Vérifier la version actuelle du Manager avant de valider l’enrôlement. Wazuh demande que le Manager soit de la même version que l’agent ou d’une version plus récente. Voir le [guide de compatibilité Wazuh](https://documentation.wazuh.com/current/upgrade-guide/index.html).
 
 ## Étapes de déploiement
 
@@ -163,8 +277,10 @@ hostname
 - [x] Lancer l’ajout de la VM Ubuntu dans Proxmox et repérer son disque dans `local`.
 - [x] Confirmer le démarrage d’Ubuntu dans la console Proxmox et relever son adresse IPv4.
 - [ ] Importer la VM Windows et vérifier son démarrage. Conserver les VM d’origine jusqu’à la validation.
-- [ ] Déployer les trois services Wazuh sur le PC 2 et vérifier l’accès au tableau de bord.
-- [ ] Tester la connectivité vers Wazuh depuis les deux VM, installer les agents et vérifier leur statut.
+- [x] Déployer les trois services Wazuh sur le PC 2 et vérifier l’accès au tableau de bord.
+- [x] Installer et démarrer l’agent Wazuh sur Ubuntu en ciblant le manager du PC 2.
+- [ ] Joindre la preuve de connexion de l’agent Ubuntu et vérifier la réception de ses journaux.
+- [ ] Installer l’agent Windows et vérifier sa connectivité au manager.
 - [ ] Configurer la collecte des journaux de Proxmox et valider la durée de conservation des journaux.
 - [ ] Exécuter les tests et ajouter les preuves au dépôt.
 
@@ -184,4 +300,5 @@ Pour chaque test, noter la date, le résultat observé et le statut **réussi** 
 
 - [Guide de migration vers Proxmox VE](https://pve.proxmox.com/wiki/Migrate_to_Proxmox_VE)
 - [Déploiement Docker officiel de Wazuh](https://documentation.wazuh.com/current/deployment-options/docker/wazuh-container.html)
+- [Fichier Docker Compose Wazuh v4.14.10](https://github.com/wazuh/wazuh-docker/blob/v4.14.10/single-node/docker-compose.yml)
 - [Architecture et ports Wazuh](https://documentation.wazuh.com/current/getting-started/architecture.html)
