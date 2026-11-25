@@ -2,7 +2,7 @@
 
 Projet académique **M352 — Sécurité de la virtualisation et du Cloud Computing**, ENSIASD.
 
-**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. Le serveur Wazuh est déployé sur Fedora 43 avec Docker Compose et son tableau de bord est accessible. L’agent Wazuh est installé et démarré sur Ubuntu. Il a été configuré pour le manager du PC 2 et sa connexion est confirmée dans le tableau de bord. La réception des journaux Ubuntu et l’import de la VM Windows restent à documenter.
+**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. Le serveur Wazuh est déployé sur Fedora 43 avec Docker Compose et son tableau de bord est accessible. Les agents Wazuh d’Ubuntu et du nœud Proxmox sont actifs dans le tableau de bord. La surveillance de `journald` est activée sur Proxmox. La réception des journaux de ces deux sources et l’import de la VM Windows restent à documenter.
 
 ## Objectif
 
@@ -28,12 +28,12 @@ flowchart TB
     end
     LNX -->|"TCP 1514"| MGR
     WIN -->|"TCP 1514"| MGR
-    PVE -.->|"Collecte des journaux à définir"| MGR
+    PVE -->|"Agent Wazuh · TCP 1514"| MGR
 ```
 
 Sur le **PC 1**, Proxmox VE est accessible depuis le laptop Windows. La VM Ubuntu démarre désormais dans Proxmox, comme le montre la section 3.2. L’import de la VM Windows reste à documenter.
 
-Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard s’exécutent avec Docker Compose sur Fedora 43. Pour Ubuntu, l’adresse du manager Wazuh utilisée est `192.168.100.238`. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. La méthode de collecte des journaux Proxmox reste à choisir.
+Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard s’exécutent avec Docker Compose sur Fedora 43. L’adresse du manager Wazuh est `192.168.100.238`. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. L’agent installé sur Proxmox surveille les entrées de `journald`.
 
 ## Étape 0 — Activer la virtualisation imbriquée pour Proxmox
 
@@ -288,6 +288,33 @@ Le statut confirme que l’agent communique avec le manager. Pour valider la col
 
 **Versions relevées** — Le déploiement serveur documenté utilise Wazuh `4.14.10`. La capture Ubuntu montre un agent `4.14.11-1`. La version actuelle du Manager reste à relever. Wazuh demande que le Manager soit de la même version que l’agent ou d’une version plus récente. Voir le [guide de compatibilité Wazuh](https://documentation.wazuh.com/current/upgrade-guide/index.html).
 
+## Étape 6 — Superviser le nœud Proxmox avec Wazuh
+
+### 6.1 Installer l’agent et activer la surveillance de `journald`
+
+Dans la console du nœud Proxmox `pve), le paquet `wazuh-agent` en version `4.14.11-1` a été installé. La sortie montre que le service est activé au démarrage (`enabled`) et en cours d’exécution (`active (running)`). La ligne `Monitoring journal entries` confirme que le collecteur Wazuh surveille les entrées du journal système.
+
+![Console du nœud Proxmox montrant l’installation de l’agent Wazuh et la surveillance de journald](docs/images/15-agent-wazuh-proxmox-journald.jpeg)
+
+*Figure 15 — Installation et démarrage de l’agent Wazuh sur le nœud Proxmox.*
+
+Lors de la mise à jour des index APT, le dépôt Proxmox Enterprise a répondu `401 Unauthorized`. La suite de la sortie montre que l’installation depuis le dépôt Wazuh a abouti.
+
+### 6.2 Confirmer la connexion au manager
+
+Dans **Endpoints**, Wazuh affiche deux agents actifs dans le groupe `default`.
+
+| ID Wazuh | Agent | Adresse IP | Système | Version de l’agent | Statut |
+|---|---|---|---|---|---|
+| `002` | `proxmox-host` | `192.168.100.16` | Debian GNU/Linux 13 | `v4.14.11` | `active` |
+| `001` | `ubuntu-endpoint` | `192.168.100.229` | Ubuntu 20.04.4 LTS | `v4.14.11` | `active` |
+
+![Tableau de bord Wazuh avec les agents proxmox-host et ubuntu-endpoint actifs](docs/images/16-wazuh-agents-proxmox-ubuntu-actifs.png)
+
+*Figure 16 — Deux agents actifs dans la vue Endpoints de Wazuh.*
+
+**Validation obtenue** — Le nœud Proxmox et la VM Ubuntu communiquent avec le manager. Pour valider la collecte de bout en bout, il reste à retrouver dans Wazuh un événement issu de `journald` sur `proxmox-host`.
+
 ## Étapes de déploiement
 
 - [x] Activer la virtualisation imbriquée pour la VM Proxmox dans VMware Workstation.
@@ -301,7 +328,8 @@ Le statut confirme que l’agent communique avec le manager. Pour valider la col
 - [x] Vérifier l’enrôlement et le statut actif de l’agent Ubuntu dans Wazuh.
 - [ ] Vérifier la réception d’un journal généré sur Ubuntu.
 - [ ] Installer l’agent Windows et vérifier sa connectivité au manager.
-- [ ] Configurer la collecte des journaux de Proxmox et valider la durée de conservation des journaux.
+- [x] Installer l’agent sur Proxmox, activer la surveillance de `journald` et vérifier son statut dans Wazuh.
+- [ ] Vérifier la réception d’un événement `journald` de Proxmox et valider la durée de conservation des journaux.
 - [ ] Exécuter les tests et ajouter les preuves au dépôt.
 
 ## Plan de validation
