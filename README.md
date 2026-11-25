@@ -35,6 +35,19 @@ Sur le **PC 1**, Proxmox VE est accessible depuis le laptop Windows. La VM Ubunt
 
 Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard seront déployés avec Docker Compose sur Ubuntu. Les agents utiliseront l’adresse IP locale du serveur Wazuh. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. La méthode de collecte des journaux Proxmox reste à choisir.
 
+## Étape 0 — Activer la virtualisation imbriquée pour Proxmox
+
+Proxmox VE s’exécute dans une VM VMware Workstation sur le laptop Windows. Pour que Proxmox puisse à son tour héberger des VM, VMware doit lui exposer les extensions matérielles de virtualisation du processeur.
+
+1. **Sur le laptop Windows**, la sécurité basée sur la virtualisation (VBS) a été désactivée pour cette configuration du lab. Broadcom indique que VBS peut empêcher VMware Workstation d’exposer les extensions de virtualisation à une VM. Voir la [note technique Broadcom](https://knowledge.broadcom.com/external/article/389469/virtualized-intel-vtxept-is-not-supporte.html).
+2. **Dans VMware Workstation**, ouvrir les paramètres de la VM **Proxmox VE**, puis **Processors**. Dans **Virtualization engine**, cocher **Virtualize Intel VT-x/EPT or AMD-V/RVI**. La capture montre que cette option est cochée et que **2 cœurs virtuels** sont attribués à la VM.
+
+![Option de virtualisation imbriquée cochée dans les paramètres VMware de la VM Proxmox](docs/images/00-virtualisation-imbriquee-vmware.jpeg)
+
+*Figure 0 — Paramètres du processeur de la VM Proxmox dans VMware Workstation.*
+
+Après le démarrage de Proxmox, le lancement d’Ubuntu dans la VM 100 a confirmé que cette configuration permettait d’exécuter une VM à l’intérieur de Proxmox (voir la section 3.2).
+
 ## Étape 1 — Repérer l’adresse IP et ouvrir Proxmox VE
 
 ### 1.1 Repérer l’adresse IP de Proxmox
@@ -144,6 +157,7 @@ hostname
 
 ## Étapes de déploiement
 
+- [x] Activer la virtualisation imbriquée pour la VM Proxmox dans VMware Workstation.
 - [x] Repérer l’adresse IP de `vmbr0`, puis accéder à l’interface de Proxmox.
 - [x] Vérifier l’état, la capacité et les types de contenu du stockage `local`.
 - [x] Lancer l’ajout de la VM Ubuntu dans Proxmox et repérer son disque dans `local`.
