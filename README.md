@@ -2,7 +2,7 @@
 
 Projet académique **M352 — Sécurité de la virtualisation et du Cloud Computing**, ENSIASD.
 
-**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. L’ajout de la VM Ubuntu est lancé sur Proxmox (ID 100). La fin de la tâche, le démarrage d’Ubuntu, l’import de la VM Windows et le déploiement de Wazuh restent à documenter.
+**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. L’import de la VM Windows, le déploiement de Wazuh et les tests de connectivité restent à documenter.
 
 ## Objectif
 
@@ -31,7 +31,7 @@ flowchart TB
     PVE -.->|"Collecte des journaux à définir"| MGR
 ```
 
-Sur le **PC 1**, Proxmox VE est accessible depuis le laptop Windows. Le démarrage d’une VM à l’intérieur de Proxmox servira à valider la virtualisation imbriquée avant l’import des deux VM existantes.
+Sur le **PC 1**, Proxmox VE est accessible depuis le laptop Windows. La VM Ubuntu démarre désormais dans Proxmox, comme le montre la section 3.2. L’import de la VM Windows reste à documenter.
 
 Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard seront déployés avec Docker Compose sur Ubuntu. Les agents utiliseront l’adresse IP locale du serveur Wazuh. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. La méthode de collecte des journaux Proxmox reste à choisir.
 
@@ -118,14 +118,36 @@ Dans **Tasks → VM 100 - Create → Output**, le transfert du disque est à **5
 
 La mention `(create)` indique que la VM est verrouillée pendant sa création. Les tentatives de démarrage visibles dans la liste des tâches échouent avec le message `can't lock file`. Laisser le transfert se terminer avant de relancer le démarrage.
 
-**Vérification suivante** — Une fois la tâche de création au statut `OK`, cliquer sur **VM 100 → Start**, puis ouvrir **Console** pour vérifier le démarrage d’Ubuntu. Dans Ubuntu, lancer `ip -br addr` pour relever son adresse IP.
+Une fois la tâche de création terminée, démarrer la VM avec **VM 100 → Start**, puis ouvrir **Console**.
+
+### 3.2 Confirmer le démarrage d’Ubuntu et relever son adresse IP
+
+Dans **pve → 100 (vm-ubuntu) → Console**, le bureau Ubuntu est affiché et le terminal répond aux commandes suivantes.
+
+```bash
+ip a
+hostname
+```
+
+![Console Proxmox de la VM Ubuntu démarrée avec son adresse IPv4 et son nom d’hôte](docs/images/06-demarrage-reseau-ubuntu.png)
+
+*Figure 6 — Bureau Ubuntu dans la console Proxmox et vérification de l’identité réseau de la VM.*
+
+| Élément | Valeur observée |
+|---|---|
+| Nom de la VM dans Proxmox | `vm-ubuntu` (ID `100`) |
+| Nom d’hôte dans Ubuntu | `ubuntu-endpoint` |
+| Interface réseau | `ens18`, état `UP` |
+| IPv4 dans Ubuntu | `192.168.100.229/24`, attribuée dynamiquement |
+
+**Validation obtenue** — Ubuntu a démarré et dispose d’une adresse dans le réseau `192.168.100.0/24`. La connexion au serveur Wazuh sur le PC 2 sera vérifiée séparément depuis Ubuntu.
 
 ## Étapes de déploiement
 
 - [x] Repérer l’adresse IP de `vmbr0`, puis accéder à l’interface de Proxmox.
 - [x] Vérifier l’état, la capacité et les types de contenu du stockage `local`.
 - [x] Lancer l’ajout de la VM Ubuntu dans Proxmox et repérer son disque dans `local`.
-- [ ] Confirmer le statut de la tâche, le démarrage d’Ubuntu et son accès au réseau du lab.
+- [x] Confirmer le démarrage d’Ubuntu dans la console Proxmox et relever son adresse IPv4.
 - [ ] Importer la VM Windows et vérifier son démarrage. Conserver les VM d’origine jusqu’à la validation.
 - [ ] Déployer les trois services Wazuh sur le PC 2 et vérifier l’accès au tableau de bord.
 - [ ] Tester la connectivité vers Wazuh depuis les deux VM, installer les agents et vérifier leur statut.
