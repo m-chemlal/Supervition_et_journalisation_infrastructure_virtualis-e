@@ -2,7 +2,7 @@
 
 Projet académique **M352 — Sécurité de la virtualisation et du Cloud Computing**, ENSIASD.
 
-**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. Le serveur Wazuh est déployé sur Fedora 43 avec Docker Compose et son tableau de bord est accessible. L’agent Wazuh est installé et démarré sur Ubuntu. Il a été configuré pour le manager du PC 2 et sa connexion est confirmée par l’équipe. La capture du statut de l’agent, les journaux reçus et l’import de la VM Windows restent à documenter.
+**État du projet** — L’interface de Proxmox VE est accessible depuis le laptop et la configuration réseau et l’état du stockage `local` sont documentés. La VM Ubuntu (ID 100) démarre sur Proxmox et possède une adresse IPv4. Le serveur Wazuh est déployé sur Fedora 43 avec Docker Compose et son tableau de bord est accessible. L’agent Wazuh est installé et démarré sur Ubuntu. Il a été configuré pour le manager du PC 2 et sa connexion est confirmée dans le tableau de bord. La réception des journaux Ubuntu et l’import de la VM Windows restent à documenter.
 
 ## Objectif
 
@@ -264,10 +264,29 @@ sudo systemctl status wazuh-agent
 | Version du paquet | `4.14.11-1` |
 | Manager configuré | `192.168.100.238` |
 | Service sur Ubuntu | `enabled` et `active (running)` |
-| Connexion au manager | Confirmée par l’équipe. Capture du statut `Active` dans le tableau de bord à joindre. |
+| Connexion au manager | Confirmée dans la vue **Endpoints** du tableau de bord (figure 14). |
 | Réception des journaux | À vérifier avec un événement généré sur Ubuntu. |
 
-**Versions relevées** — Le déploiement serveur documenté utilise Wazuh `4.14.10`. La capture Ubuntu montre un agent `4.14.11-1`. Vérifier la version actuelle du Manager avant de valider l’enrôlement. Wazuh demande que le Manager soit de la même version que l’agent ou d’une version plus récente. Voir le [guide de compatibilité Wazuh](https://documentation.wazuh.com/current/upgrade-guide/index.html).
+### 5.1 Vérifier l’enrôlement dans Wazuh
+
+Dans le tableau de bord, ouvrir **Endpoints** et rechercher `ubuntu-endpoint`. La vue affiche **1 agent actif**. L’adresse affichée correspond à celle relevée dans Ubuntu à l’étape 3.2.
+
+![Vue Endpoints de Wazuh affichant ubuntu-endpoint avec le statut active](docs/images/14-wazuh-agent-ubuntu-actif.png)
+
+*Figure 14 — Agent Ubuntu enrôlé et actif dans Wazuh.*
+
+| Élément | Valeur observée |
+|---|---|
+| ID de l’agent Wazuh | `001` |
+| Nom et adresse IP | `ubuntu-endpoint` · `192.168.100.229` |
+| Système | Ubuntu 20.04.4 LTS |
+| Groupe et nœud Wazuh | `default` · `node01` |
+| Version de l’agent | `v4.14.11` |
+| Statut | `active` |
+
+Le statut confirme que l’agent communique avec le manager. Pour valider la collecte, il reste à générer un événement sur Ubuntu et à le retrouver dans Wazuh.
+
+**Versions relevées** — Le déploiement serveur documenté utilise Wazuh `4.14.10`. La capture Ubuntu montre un agent `4.14.11-1`. La version actuelle du Manager reste à relever. Wazuh demande que le Manager soit de la même version que l’agent ou d’une version plus récente. Voir le [guide de compatibilité Wazuh](https://documentation.wazuh.com/current/upgrade-guide/index.html).
 
 ## Étapes de déploiement
 
@@ -279,7 +298,8 @@ sudo systemctl status wazuh-agent
 - [ ] Importer la VM Windows et vérifier son démarrage. Conserver les VM d’origine jusqu’à la validation.
 - [x] Déployer les trois services Wazuh sur le PC 2 et vérifier l’accès au tableau de bord.
 - [x] Installer et démarrer l’agent Wazuh sur Ubuntu en ciblant le manager du PC 2.
-- [ ] Joindre la preuve de connexion de l’agent Ubuntu et vérifier la réception de ses journaux.
+- [x] Vérifier l’enrôlement et le statut actif de l’agent Ubuntu dans Wazuh.
+- [ ] Vérifier la réception d’un journal généré sur Ubuntu.
 - [ ] Installer l’agent Windows et vérifier sa connectivité au manager.
 - [ ] Configurer la collecte des journaux de Proxmox et valider la durée de conservation des journaux.
 - [ ] Exécuter les tests et ajouter les preuves au dépôt.
