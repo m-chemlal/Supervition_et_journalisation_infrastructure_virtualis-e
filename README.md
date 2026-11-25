@@ -35,19 +35,9 @@ Sur le **PC 1**, Proxmox VE est accessible depuis le laptop Windows. Le démarra
 
 Sur le **PC 2**, Wazuh Manager, Indexer et Dashboard seront déployés avec Docker Compose sur Ubuntu. Les agents utiliseront l’adresse IP locale du serveur Wazuh. Les ports par défaut sont TCP 1515 pour l’enrôlement et TCP 1514 pour la communication des agents. La méthode de collecte des journaux Proxmox reste à choisir.
 
-## Étape 1 — Accéder à Proxmox VE et vérifier son réseau
+## Étape 1 — Repérer l’adresse IP et ouvrir Proxmox VE
 
-### 1.1 Vérifier l’accès à l’interface web
-
-Depuis le navigateur du laptop Windows, l’interface d’administration s’ouvre à l’adresse `https://192.168.100.16:8006`. La vue **Datacenter** affiche **Proxmox VE 9.3.1**, le nœud `pve` et les espaces de stockage `local` et `local-lvm`.
-
-![Vue Datacenter de Proxmox VE avec le nœud pve et ses espaces de stockage](docs/images/01-interface-proxmox.png)
-
-*Figure 1 — Accès à l’interface d’administration du nœud Proxmox.*
-
-Le navigateur signale un problème de confiance avec le certificat HTTPS. La capture montre aussi un échec de la tâche **Update package database**. Le détail de cette tâche sera nécessaire pour en identifier la cause.
-
-### 1.2 Identifier le pont réseau `vmbr0`
+### 1.1 Repérer l’adresse IP de Proxmox
 
 Deux commandes ont été exécutées dans la console de Proxmox.
 
@@ -56,11 +46,11 @@ cat /etc/network/interfaces
 ip -br addr
 ```
 
-La première affiche la configuration réseau. La seconde résume l’état des interfaces et leurs adresses IP.
+La première affiche la configuration réseau. La seconde résume l’état des interfaces et leurs adresses IP. Sur la ligne `vmbr0`, l’interface est `UP` et l’IPv4 affichée est `192.168.100.16/24`.
 
-![Configuration et adresses IP des interfaces nic0 et vmbr0](docs/images/02-reseau-vmbr0.jpg)
+![Configuration et adresses IP des interfaces nic0 et vmbr0](docs/images/01-reseau-vmbr0.jpg)
 
-*Figure 2 — Configuration du pont réseau et adresse IPv4 observée sur Proxmox.*
+*Figure 1 — Configuration du pont réseau et adresse IPv4 observée sur Proxmox.*
 
 | Élément | Observation | Rôle dans le lab |
 |---|---|---|
@@ -68,12 +58,21 @@ La première affiche la configuration réseau. La seconde résume l’état des 
 | `vmbr0` | Pont actif, associé à `nic0` via `bridge-ports nic0`. | Porte l’adresse d’administration et pourra servir à connecter les VM au réseau. |
 | IPv4 de `vmbr0` | `192.168.100.16/24` lors de la capture. | Adresse utilisée pour ouvrir l’interface web depuis le laptop. Elle est attribuée par DHCP et peut changer. |
 
+### 1.2 Ouvrir l’interface graphique
+
+Une fois l’adresse IP repérée, ouvrir le navigateur du laptop Windows et saisir `https://192.168.100.16:8006`. Saisir l’IPv4 sans le suffixe `/24`, qui indique la longueur du préfixe réseau. La vue **Datacenter** affiche **Proxmox VE 9.3.1**, le nœud `pve` et les espaces de stockage `local` et `local-lvm`.
+
+![Vue Datacenter de Proxmox VE avec le nœud pve et ses espaces de stockage](docs/images/02-interface-proxmox.png)
+
+*Figure 2 — Accès à l’interface d’administration du nœud Proxmox.*
+
+Le navigateur signale un problème de confiance avec le certificat HTTPS. La capture montre aussi un échec de la tâche **Update package database**. Le détail de cette tâche sera nécessaire pour en identifier la cause.
+
 **Validation obtenue** — Le laptop atteint l’interface web de Proxmox et le pont `vmbr0` dispose d’une adresse IPv4. Le prochain test consiste à démarrer une VM dans Proxmox, puis à vérifier son accès au réseau du lab.
 
 ## Étapes de déploiement
 
-- [x] Accéder à l’interface de Proxmox et relever la configuration de `vmbr0`.
-
+- [x] Repérer l’adresse IP de `vmbr0`, puis accéder à l’interface de Proxmox.
 - [ ] Vérifier la virtualisation imbriquée sur le laptop et démarrer une VM de test dans Proxmox.
 - [ ] Importer d’abord la VM Linux, puis la VM Windows. Vérifier le démarrage et conserver les VM d’origine jusqu’à la validation.
 - [ ] Déployer les trois services Wazuh sur le PC 2 et vérifier l’accès au tableau de bord.
